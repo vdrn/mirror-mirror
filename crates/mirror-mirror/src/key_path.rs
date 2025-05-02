@@ -62,6 +62,7 @@ where
                     | ReflectRef::Tuple(_)
                     | ReflectRef::Array(_)
                     | ReflectRef::List(_)
+                    | ReflectRef::Set(_)
                     | ReflectRef::Map(_)
                     | ReflectRef::Scalar(_)
                     | ReflectRef::Opaque(_) => return None,
@@ -78,6 +79,7 @@ where
                     | ReflectRef::Struct(_)
                     | ReflectRef::Array(_)
                     | ReflectRef::List(_)
+                    | ReflectRef::Set(_)
                     | ReflectRef::Scalar(_)
                     | ReflectRef::Opaque(_) => return None,
                 },
@@ -90,6 +92,7 @@ where
                     | ReflectRef::TupleStruct(_)
                     | ReflectRef::Tuple(_)
                     | ReflectRef::Enum(_)
+                    | ReflectRef::Set(_)
                     | ReflectRef::Scalar(_)
                     | ReflectRef::Opaque(_) => return None,
                 },
@@ -108,6 +111,7 @@ where
                     | ReflectRef::List(_)
                     | ReflectRef::Array(_)
                     | ReflectRef::Map(_)
+                    | ReflectRef::Set(_)
                     | ReflectRef::Opaque(_)
                     | ReflectRef::Scalar(_) => return None,
                 },
@@ -150,6 +154,7 @@ where
                     | ReflectMut::Array(_)
                     | ReflectMut::List(_)
                     | ReflectMut::Map(_)
+                    | ReflectMut::Set(_)
                     | ReflectMut::Scalar(_)
                     | ReflectMut::Opaque(_) => return None,
                 },
@@ -165,6 +170,7 @@ where
                     | ReflectMut::Struct(_)
                     | ReflectMut::Array(_)
                     | ReflectMut::List(_)
+                    | ReflectMut::Set(_)
                     | ReflectMut::Scalar(_)
                     | ReflectMut::Opaque(_) => return None,
                 },
@@ -177,6 +183,7 @@ where
                     | ReflectMut::TupleStruct(_)
                     | ReflectMut::Tuple(_)
                     | ReflectMut::Enum(_)
+                    | ReflectMut::Set(_)
                     | ReflectMut::Scalar(_)
                     | ReflectMut::Opaque(_) => return None,
                 },
@@ -195,6 +202,7 @@ where
                     | ReflectMut::List(_)
                     | ReflectMut::Array(_)
                     | ReflectMut::Map(_)
+                    | ReflectMut::Set(_)
                     | ReflectMut::Opaque(_)
                     | ReflectMut::Scalar(_) => return None,
                 },
@@ -262,8 +270,8 @@ impl KeyPath {
         self.path.is_empty()
     }
 
-    pub fn pop(&mut self) {
-        self.path.pop();
+    pub fn pop(&mut self) -> Option<Key> {
+        self.path.pop()
     }
 
     pub fn iter(&self) -> Iter<'_> {
@@ -349,19 +357,19 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for Iter<'a> {
+impl DoubleEndedIterator for Iter<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.0.next_back()
     }
 }
 
-impl<'a> ExactSizeIterator for Iter<'a> {
+impl ExactSizeIterator for Iter<'_> {
     fn len(&self) -> usize {
         self.0.len()
     }
 }
 
-impl<'a> FusedIterator for Iter<'a> {}
+impl FusedIterator for Iter<'_> {}
 
 mod private {
     use super::*;
@@ -588,6 +596,7 @@ pub(crate) fn value_to_usize(value: &Value) -> Option<usize> {
         | Value::TupleStructValue(_)
         | Value::TupleValue(_)
         | Value::List(_)
+        | Value::Set(_)
         | Value::Map(_) => None,
     }
 }

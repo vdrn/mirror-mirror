@@ -4,7 +4,7 @@ use crate::{DescribeType, FromReflect, Reflect};
 
 #[test]
 fn option_uses_none_as_default() {
-    #[derive(Reflect, Clone, Debug, PartialEq, Eq)]
+    #[derive(Reflect, Clone, Debug, Default, PartialEq, Eq)]
     #[reflect(crate_name(crate))]
     struct Foo {
         x: Option<i32>,
@@ -27,5 +27,5 @@ fn hash() {
 
     assert_eq!(map.get(&1_i32.to_value()).unwrap(), &"one");
     assert_eq!(map.get(&"foo".to_owned().to_value()).unwrap(), &"two");
-    assert!(map.get(&true.to_value()).is_none());
+    assert!(!map.contains_key(&true.to_value()));
 }

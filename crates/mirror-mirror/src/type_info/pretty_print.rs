@@ -18,7 +18,7 @@ where
     ty: &'a T,
 }
 
-impl<'a, T> fmt::Display for RootPrettyPrinter<'a, T>
+impl<T> fmt::Display for RootPrettyPrinter<'_, T>
 where
     T: PrettyPrintRoot,
 {
@@ -33,7 +33,7 @@ impl PrettyPrintRoot for TypeDescriptor {
     }
 }
 
-impl<'a> PrettyPrintRoot for Type<'a> {
+impl PrettyPrintRoot for Type<'_> {
     fn pretty_root_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Type::Struct(inner) => inner.pretty_root_fmt(f),
@@ -43,13 +43,14 @@ impl<'a> PrettyPrintRoot for Type<'a> {
             Type::List(inner) => inner.pretty_root_fmt(f),
             Type::Array(inner) => inner.pretty_root_fmt(f),
             Type::Map(inner) => inner.pretty_root_fmt(f),
+            Type::Set(inner) => inner.pretty_root_fmt(f),
             Type::Scalar(inner) => inner.pretty_root_fmt(f),
             Type::Opaque(inner) => inner.pretty_root_fmt(f),
         }
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "simple_type_name")]
 fn simple_type_name_fmt(type_name: &str, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     if let Some(name) = super::SimpleTypeName::new(type_name) {
         write!(f, "{name}")
@@ -58,14 +59,14 @@ fn simple_type_name_fmt(type_name: &str, f: &mut fmt::Formatter<'_>) -> fmt::Res
     }
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "simple_type_name"))]
 fn simple_type_name_fmt(type_name: &str, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.write_str(type_name)
 }
 
 const TAB: &str = "    ";
 
-impl<'a> PrettyPrintRoot for StructType<'a> {
+impl PrettyPrintRoot for StructType<'_> {
     fn pretty_root_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("struct ")?;
         simple_type_name_fmt(self.type_name(), f)?;
@@ -86,7 +87,7 @@ impl<'a> PrettyPrintRoot for StructType<'a> {
     }
 }
 
-impl<'a> PrettyPrintRoot for TupleStructType<'a> {
+impl PrettyPrintRoot for TupleStructType<'_> {
     fn pretty_root_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("struct ")?;
         simple_type_name_fmt(self.type_name(), f)?;
@@ -103,7 +104,7 @@ impl<'a> PrettyPrintRoot for TupleStructType<'a> {
     }
 }
 
-impl<'a> PrettyPrintRoot for TupleType<'a> {
+impl PrettyPrintRoot for TupleType<'_> {
     fn pretty_root_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("(")?;
         let mut fields = self.field_types().peekable();
@@ -118,7 +119,7 @@ impl<'a> PrettyPrintRoot for TupleType<'a> {
     }
 }
 
-impl<'a> PrettyPrintRoot for EnumType<'a> {
+impl PrettyPrintRoot for EnumType<'_> {
     fn pretty_root_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("enum ")?;
         simple_type_name_fmt(self.type_name(), f)?;
@@ -172,7 +173,7 @@ impl<'a> PrettyPrintRoot for EnumType<'a> {
     }
 }
 
-impl<'a> PrettyPrintRoot for ListType<'a> {
+impl PrettyPrintRoot for ListType<'_> {
     fn pretty_root_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_char('[')?;
         simple_type_name_fmt(self.element_type().type_name(), f)?;
@@ -181,7 +182,7 @@ impl<'a> PrettyPrintRoot for ListType<'a> {
     }
 }
 
-impl<'a> PrettyPrintRoot for ArrayType<'a> {
+impl PrettyPrintRoot for ArrayType<'_> {
     fn pretty_root_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_char('[')?;
         simple_type_name_fmt(self.element_type().type_name(), f)?;
@@ -192,13 +193,22 @@ impl<'a> PrettyPrintRoot for ArrayType<'a> {
     }
 }
 
-impl<'a> PrettyPrintRoot for MapType<'a> {
+impl PrettyPrintRoot for MapType<'_> {
     fn pretty_root_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_char('[')?;
         simple_type_name_fmt(self.key_type().type_name(), f)?;
         f.write_str(": ")?;
         simple_type_name_fmt(self.value_type().type_name(), f)?;
         f.write_char(']')?;
+        Ok(())
+    }
+}
+
+impl PrettyPrintRoot for SetType<'_> {
+    fn pretty_root_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_char('{')?;
+        simple_type_name_fmt(self.element_type().type_name(), f)?;
+        f.write_char('}')?;
         Ok(())
     }
 }
@@ -227,7 +237,7 @@ impl PrettyPrintRoot for ScalarType {
     }
 }
 
-impl<'a> PrettyPrintRoot for OpaqueType<'a> {
+impl PrettyPrintRoot for OpaqueType<'_> {
     fn pretty_root_fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         simple_type_name_fmt(self.type_name(), f)?;
         Ok(())
@@ -237,6 +247,9 @@ impl<'a> PrettyPrintRoot for OpaqueType<'a> {
 #[cfg(test)]
 mod tests {
     use core::time::Duration;
+    use std::collections::HashMap;
+
+    use alloc::collections::BTreeMap;
 
     use super::*;
     use crate::{DescribeType, Reflect};
@@ -253,7 +266,7 @@ mod tests {
 
     #[test]
     fn struct_() {
-        #[derive(Reflect, Clone, Debug)]
+        #[derive(Reflect, Clone, Debug, Default)]
         #[reflect(crate_name(crate))]
         struct Foo {
             a: String,
@@ -274,7 +287,7 @@ mod tests {
 
     #[test]
     fn struct_empty() {
-        #[derive(Reflect, Clone, Debug)]
+        #[derive(Reflect, Clone, Debug, Default)]
         #[reflect(crate_name(crate))]
         struct Foo {}
 
@@ -286,7 +299,7 @@ mod tests {
 
     #[test]
     fn tuple_struct() {
-        #[derive(Reflect, Clone, Debug)]
+        #[derive(Reflect, Clone, Debug, Default)]
         #[reflect(crate_name(crate))]
         struct Foo(String, Vec<i32>);
 
@@ -301,7 +314,7 @@ mod tests {
 
     #[test]
     fn tuple_struct_empty() {
-        #[derive(Reflect, Clone, Debug)]
+        #[derive(Reflect, Clone, Debug, Default)]
         #[reflect(crate_name(crate))]
         struct Foo();
 
@@ -313,7 +326,7 @@ mod tests {
 
     #[test]
     fn unit_struct() {
-        #[derive(Reflect, Clone, Debug)]
+        #[derive(Reflect, Clone, Debug, Default)]
         #[reflect(crate_name(crate))]
         struct Foo;
 
@@ -335,7 +348,7 @@ mod tests {
     #[test]
     fn enum_() {
         #[derive(Reflect, Clone, Debug)]
-        #[reflect(crate_name(crate))]
+        #[reflect(crate_name(crate), opt_out(Default))]
         enum Foo {
             A(String, i32),
             A2(),
@@ -383,6 +396,11 @@ mod tests {
         let pp = type_descriptor.pretty_print_root();
 
         assert_eq!(println_and_format!("{pp}"), r#"[String: i32]"#);
+
+        let type_descriptor = <HashMap<u32, (String, i32)> as DescribeType>::type_descriptor();
+        let pp = type_descriptor.pretty_print_root();
+
+        assert_eq!(println_and_format!("{pp}"), r#"[u32: (String, i32)]"#);
     }
 
     #[test]

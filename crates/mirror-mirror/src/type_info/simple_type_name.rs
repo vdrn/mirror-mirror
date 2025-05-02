@@ -5,8 +5,8 @@ use core::{any::type_name, fmt};
 use alloc::borrow::Cow;
 use syn::{
     token::Mut, AngleBracketedGenericArguments, Expr, ExprLit, GenericArgument, Ident, Lit,
-    LitBool, LitFloat, LitInt, Path, PathArguments, PathSegment, Type, TypeArray, TypePath,
-    TypeReference, TypeTuple,
+    LitBool, LitFloat, LitInt, Path, PathArguments, PathSegment, TraitBound, TraitBoundModifier,
+    Type, TypeArray, TypeParamBound, TypePath, TypeReference, TypeTraitObject, TypeTuple,
 };
 
 /// A writer for simplified type names.
@@ -90,7 +90,10 @@ impl SimpleTypeName {
         Some(Self { ty })
     }
 
-    pub fn new_from_type<T>() -> Self {
+    pub fn new_from_type<T>() -> Self
+    where
+        T: ?Sized,
+    {
         let name = type_name::<T>();
         Self::new(name).unwrap_or_else(|| panic!("failed to parse type name: `{name}`"))
     }
@@ -111,13 +114,14 @@ struct TypeWriter<'a, 'b> {
 }
 
 #[allow(clippy::wildcard_in_or_patterns)]
-impl<'a, 'b> WriteAst<Type> for TypeWriter<'a, 'b> {
+impl WriteAst<Type> for TypeWriter<'_, '_> {
     fn write(&mut self, ty: &Type) -> fmt::Result {
         match ty {
             Type::Array(inner) => self.write(inner),
             Type::Path(inner) => self.write(inner),
             Type::Tuple(inner) => self.write(inner),
             Type::Reference(inner) => self.write(inner),
+            Type::TraitObject(inner) => self.write(inner),
             Type::BareFn(_)
             | Type::Group(_)
             | Type::ImplTrait(_)
@@ -127,14 +131,13 @@ impl<'a, 'b> WriteAst<Type> for TypeWriter<'a, 'b> {
             | Type::Paren(_)
             | Type::Ptr(_)
             | Type::Slice(_)
-            | Type::TraitObject(_)
             | Type::Verbatim(_)
             | _ => Err(fmt::Error),
         }
     }
 }
 
-impl<'a, 'b> WriteAst<TypeArray> for TypeWriter<'a, 'b> {
+impl WriteAst<TypeArray> for TypeWriter<'_, '_> {
     fn write(&mut self, array: &TypeArray) -> fmt::Result {
         let TypeArray {
             bracket_token: _,
@@ -152,7 +155,7 @@ impl<'a, 'b> WriteAst<TypeArray> for TypeWriter<'a, 'b> {
 }
 
 #[allow(clippy::wildcard_in_or_patterns)]
-impl<'a, 'b> WriteAst<Expr> for TypeWriter<'a, 'b> {
+impl WriteAst<Expr> for TypeWriter<'_, '_> {
     fn write(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
             Expr::Lit(inner) => self.write(inner),
@@ -199,7 +202,7 @@ impl<'a, 'b> WriteAst<Expr> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<ExprLit> for TypeWriter<'a, 'b> {
+impl WriteAst<ExprLit> for TypeWriter<'_, '_> {
     fn write(&mut self, lit: &ExprLit) -> fmt::Result {
         let ExprLit { attrs: _, lit } = lit;
         self.write(lit)?;
@@ -207,7 +210,7 @@ impl<'a, 'b> WriteAst<ExprLit> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<Lit> for TypeWriter<'a, 'b> {
+impl WriteAst<Lit> for TypeWriter<'_, '_> {
     fn write(&mut self, lit: &Lit) -> fmt::Result {
         match lit {
             Lit::Int(inner) => self.write(inner),
@@ -220,25 +223,25 @@ impl<'a, 'b> WriteAst<Lit> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<LitInt> for TypeWriter<'a, 'b> {
+impl WriteAst<LitInt> for TypeWriter<'_, '_> {
     fn write(&mut self, lit: &LitInt) -> fmt::Result {
         write!(self.f, "{lit}")
     }
 }
 
-impl<'a, 'b> WriteAst<LitFloat> for TypeWriter<'a, 'b> {
+impl WriteAst<LitFloat> for TypeWriter<'_, '_> {
     fn write(&mut self, lit: &LitFloat) -> fmt::Result {
         write!(self.f, "{lit}")
     }
 }
 
-impl<'a, 'b> WriteAst<LitBool> for TypeWriter<'a, 'b> {
+impl WriteAst<LitBool> for TypeWriter<'_, '_> {
     fn write(&mut self, lit: &LitBool) -> fmt::Result {
         write!(self.f, "{}", lit.value)
     }
 }
 
-impl<'a, 'b> WriteAst<TypePath> for TypeWriter<'a, 'b> {
+impl WriteAst<TypePath> for TypeWriter<'_, '_> {
     fn write(&mut self, ty: &TypePath) -> fmt::Result {
         let TypePath { qself, path } = ty;
         if qself.is_some() {
@@ -249,7 +252,7 @@ impl<'a, 'b> WriteAst<TypePath> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<Path> for TypeWriter<'a, 'b> {
+impl WriteAst<Path> for TypeWriter<'_, '_> {
     fn write(&mut self, path: &Path) -> fmt::Result {
         let Path {
             leading_colon: _,
@@ -261,7 +264,7 @@ impl<'a, 'b> WriteAst<Path> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<PathSegment> for TypeWriter<'a, 'b> {
+impl WriteAst<PathSegment> for TypeWriter<'_, '_> {
     fn write(&mut self, path_segment: &PathSegment) -> fmt::Result {
         let PathSegment { ident, arguments } = path_segment;
         self.write(ident)?;
@@ -270,14 +273,14 @@ impl<'a, 'b> WriteAst<PathSegment> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<Ident> for TypeWriter<'a, 'b> {
+impl WriteAst<Ident> for TypeWriter<'_, '_> {
     fn write(&mut self, ident: &Ident) -> fmt::Result {
         write!(self.f, "{ident}")?;
         Ok(())
     }
 }
 
-impl<'a, 'b> WriteAst<PathArguments> for TypeWriter<'a, 'b> {
+impl WriteAst<PathArguments> for TypeWriter<'_, '_> {
     fn write(&mut self, args: &PathArguments) -> fmt::Result {
         match args {
             PathArguments::None => Ok(()),
@@ -287,7 +290,7 @@ impl<'a, 'b> WriteAst<PathArguments> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<AngleBracketedGenericArguments> for TypeWriter<'a, 'b> {
+impl WriteAst<AngleBracketedGenericArguments> for TypeWriter<'_, '_> {
     fn write(&mut self, args: &AngleBracketedGenericArguments) -> fmt::Result {
         let AngleBracketedGenericArguments {
             colon2_token: _,
@@ -308,7 +311,7 @@ impl<'a, 'b> WriteAst<AngleBracketedGenericArguments> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<GenericArgument> for TypeWriter<'a, 'b> {
+impl WriteAst<GenericArgument> for TypeWriter<'_, '_> {
     fn write(&mut self, arg: &GenericArgument) -> fmt::Result {
         match arg {
             GenericArgument::Type(inner) => self.write(inner),
@@ -322,7 +325,7 @@ impl<'a, 'b> WriteAst<GenericArgument> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<TypeTuple> for TypeWriter<'a, 'b> {
+impl WriteAst<TypeTuple> for TypeWriter<'_, '_> {
     fn write(&mut self, ty: &TypeTuple) -> fmt::Result {
         let TypeTuple {
             paren_token: _,
@@ -348,7 +351,7 @@ impl<'a, 'b> WriteAst<TypeTuple> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<TypeReference> for TypeWriter<'a, 'b> {
+impl WriteAst<TypeReference> for TypeWriter<'_, '_> {
     fn write(&mut self, ty_ref: &TypeReference) -> fmt::Result {
         let TypeReference {
             and_token: _,
@@ -367,8 +370,42 @@ impl<'a, 'b> WriteAst<TypeReference> for TypeWriter<'a, 'b> {
     }
 }
 
-impl<'a, 'b> WriteAst<Mut> for TypeWriter<'a, 'b> {
+impl WriteAst<Mut> for TypeWriter<'_, '_> {
     fn write(&mut self, _: &Mut) -> fmt::Result {
         write!(self.f, "mut")
+    }
+}
+
+impl WriteAst<TypeTraitObject> for TypeWriter<'_, '_> {
+    fn write(&mut self, ty: &TypeTraitObject) -> fmt::Result {
+        write!(self.f, "dyn ")?;
+        match ty.bounds.last().ok_or(fmt::Error)? {
+            TypeParamBound::Trait(inner) => self.write(inner),
+            TypeParamBound::Lifetime(_) | TypeParamBound::Verbatim(_) | _ => Err(fmt::Error),
+        }
+    }
+}
+
+impl WriteAst<TraitBound> for TypeWriter<'_, '_> {
+    fn write(&mut self, ty: &TraitBound) -> fmt::Result {
+        let TraitBound {
+            paren_token: _,
+            modifier,
+            lifetimes,
+            path,
+        } = ty;
+
+        match modifier {
+            TraitBoundModifier::None => {}
+            TraitBoundModifier::Maybe(_) => {
+                return Err(fmt::Error);
+            }
+        }
+
+        if lifetimes.is_some() {
+            return Err(fmt::Error);
+        }
+
+        self.write(path)
     }
 }
