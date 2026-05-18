@@ -1,5 +1,6 @@
 use core::any::type_name;
 use core::iter::Peekable;
+use std::sync::OnceLock;
 
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
@@ -43,15 +44,15 @@ pub trait DescribeType: 'static {
         use std::sync::RwLock;
 
         // amortizing creation of type descriptors so that each process only needs to compute a type descriptor for each type once
-        static INFO: OnceBox<RwLock<HashMap<TypeId, &'static TypeDescriptor, ahash::RandomState>>> =
-            OnceBox::new();
+        static INFO: OnceLock<RwLock<HashMap<TypeId, &'static TypeDescriptor, rustc_hash::FxBuildHasher>>> =
+            OnceLock::new();
 
         let type_id = TypeId::of::<Self>();
 
         let lock = INFO.get_or_init(|| {
-            Box::from(RwLock::new(HashMap::with_hasher(
+            RwLock::new(HashMap::with_hasher(
                 STATIC_RANDOM_STATE.clone(),
-            ))) // use seeded random state
+            )) // use seeded random state
         });
         if let Some(info) = lock.read().unwrap().get(&type_id) {
             return Cow::Borrowed(info);

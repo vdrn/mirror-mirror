@@ -8,6 +8,7 @@ use core::hash::Hash;
 use core::hash::Hasher;
 use core::ops::Deref;
 use kollect::LinearMap;
+use std::hash::BuildHasher;
 
 use super::*;
 use crate::Value;

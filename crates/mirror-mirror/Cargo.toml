@@ -21,18 +21,14 @@ glam-scalar-math = ["glam/scalar-math"]
 macaw = ["dep:macaw"]
 
 [dependencies]
-ahash = { version = "0.8.2", default-features = false, features = [
-    # required for wasm support
-    "no-rng",
-] }
+rustc-hash = { version = "2", default-features = false }
 kollect = { version = "0.5", default-features = false }
 mirror-mirror-macros = { path = "../mirror-mirror-macros", version = "0.2.0-rc.1" }
-once_cell = { version = "1.16", features = ["alloc", "race", "critical-section"], default-features = false }
 tiny-ordered-float = { version = "0.4", default-features = false }
 serde = { version = "1.0.158", default-features = false, features = ["derive", "alloc"], optional = true }
 speedy = { version = "0.8", optional = true }
 syn = { version = "2.0", features = ["full", "parsing"], optional = true }
-glam = { version = ">= 0.28, <= 0.30", optional = true }
+glam = { version = "0.32", optional = true }
 macaw = { version = "0.30", optional = true }
 
 [dev-dependencies]
